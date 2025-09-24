@@ -1,6 +1,10 @@
-import { IMedia } from '../../interfaces';
-import { UserType } from '../enums';
-import { User } from '../entities/User';
+import type { IMedia } from '../../interfaces';
+import type { User } from '../entities/User';
+import type { UserType } from '../enums';
+
+
+
+
 
 // API Response Types
 export interface ApiResponse<T = any> {

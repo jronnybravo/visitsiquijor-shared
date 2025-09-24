@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as ts from 'typescript';
 
 interface EntityProperty {
     name: string;
@@ -29,9 +30,9 @@ class TypeGenerator {
     }
 
     async generate() {
-        console.log('🚀 Starting type generation...');
+        console.log('🚀 Starting type generation using TypeScript AST...');
         
-        // Parse all entity files
+        // Parse all entity files using TypeScript compiler
         await this.parseEntities();
         
         // Generate type files
@@ -53,174 +54,88 @@ class TypeGenerator {
         for (const file of files) {
             const filePath = path.join(entitiesPath, file);
             const content = fs.readFileSync(filePath, 'utf-8');
-            const entityInfos = this.parseEntityFile(content, file);
+            
+            // Create TypeScript source file
+            const sourceFile = ts.createSourceFile(
+                filePath,
+                content,
+                ts.ScriptTarget.Latest,
+                true
+            );
+            
+            const entityInfos = this.parseEntityFile(sourceFile, file);
             for (const entityInfo of entityInfos) {
                 this.entities.set(entityInfo.name, entityInfo);
+                console.log(`✅ Parsed entity: ${entityInfo.name} (${entityInfo.properties.length} properties, ${entityInfo.computedProperties.length} computed)`);
             }
         }
     }
 
-    private parseEntityFile(content: string, filename: string): EntityInfo[] {
+    private parseEntityFile(sourceFile: ts.SourceFile, filename: string): EntityInfo[] {
         const entities: EntityInfo[] = [];
         
-        // Skip if not an entity file
-        if (!content.includes('@Entity()') && !content.includes('@ChildEntity(')) {
-            return entities;
-        }
-
-        // Find all entity classes in the file
-        const entityMatches = content.matchAll(/(?:@Entity\(\)|@ChildEntity\([^)]*\))\s*(?:@[^\n]*\s*)*export\s+class\s+(\w+)/g);
-        
-        for (const match of entityMatches) {
-            const entityName = match[1];
-            const entityInfo = this.parseEntityClass(content, entityName);
-            if (entityInfo) {
-                entities.push(entityInfo);
+        // Visit all nodes in the AST
+        const visit = (node: ts.Node) => {
+            if (ts.isClassDeclaration(node) && node.name) {
+                const entityInfo = this.parseEntityClass(node, sourceFile);
+                if (entityInfo) {
+                    entities.push(entityInfo);
+                }
             }
-        }
-
+            ts.forEachChild(node, visit);
+        };
+        
+        visit(sourceFile);
         return entities;
     }
 
-    private parseEntityClass(content: string, entityName: string): EntityInfo | null {
+    private parseEntityClass(classNode: ts.ClassDeclaration, sourceFile: ts.SourceFile): EntityInfo | null {
+        if (!classNode.name) return null;
+        
+        const entityName = classNode.name.text;
         const properties: EntityProperty[] = [];
         const computedProperties: EntityProperty[] = [];
-        let isChildEntity = false;
+        
+        // Check if this class has @Entity or @ChildEntity decorator
+        const hasEntityDecorator = this.hasDecorator(classNode, ['Entity', 'ChildEntity']);
+        if (!hasEntityDecorator) {
+            return null;
+        }
+        
+        console.log(`\n🔍 Parsing entity: ${entityName}`);
+        
+        // Check if it's a child entity and get parent
+        const isChildEntity = this.hasDecorator(classNode, ['ChildEntity']);
         let parentEntity: string | undefined;
-
-        // Find the class definition
-        const classRegex = new RegExp(`(?:@Entity\\(\\)|@ChildEntity\\([^)]*\\))\\s*(?:@[^\\n]*\\s*)*export\\s+class\\s+${entityName}(?:\\s+extends\\s+(\\w+))?[^{]*{([^}]*(?:{[^}]*}[^}]*)*)}`, 's');
-        const classMatch = content.match(classRegex);
         
-        if (!classMatch) {
-            return null;
-        }
-
-        const classContent = classMatch[0];
-        const extendsClass = classMatch[1];
-        
-        // Check if it's a child entity
-        const childEntityMatch = classContent.match(/@ChildEntity\([^)]*\)/);
-        if (childEntityMatch) {
-            isChildEntity = true;
-            parentEntity = extendsClass;
-        }
-
-        // Parse properties only from the specific class content, not the entire file
-        const classBodyMatch = classContent.match(/{([^}]*(?:{[^}]*}[^}]*)*)}/s);
-        if (!classBodyMatch) {
-            return null;
-        }
-        
-        const classBody = classBodyMatch[1];
-        const lines = classBody.split('\n');
-        let currentDecorators: string[] = [];
-        
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            
-            // Collect decorators
-            if (line.startsWith('@') && !line.includes(':')) {
-                currentDecorators.push(line);
-                continue;
-            }
-            
-            // Check if this is a property declaration
-            const propMatch = line.match(/^(\w+)(\?)?:\s*([^;]+);?\s*$/);
-            if (propMatch && currentDecorators.length > 0) {
-                const propName = propMatch[1];
-                const isOptional = !!propMatch[2] || currentDecorators.some(d => d.includes('nullable: true'));
-                const propTypeRaw = propMatch[3].trim();
-                
-                // Skip excluded properties
-                if (currentDecorators.some(d => d.includes('@Exclude'))) {
-                    currentDecorators = [];
-                    continue;
-                }
-                
-                // Handle different decorator types
-                if (currentDecorators.some(d => d.includes('@PrimaryGeneratedColumn'))) {
-                    properties.push({
-                        name: propName,
-                        type: 'number',
-                        isOptional: false,
-                        isArray: false,
-                        isRelation: false
-                    });
-                } else if (currentDecorators.some(d => d.includes('@Column'))) {
-                    const propType = this.mapTypeOrmTypeToTS(propTypeRaw);
-                    // Check if column is nullable from decorator
-                    const columnDecorator = currentDecorators.find(d => d.includes('@Column'));
-                    const isNullable = columnDecorator?.includes('nullable: true') || false;
-                    properties.push({
-                        name: propName,
-                        type: propType.type,
-                        isOptional: isOptional || propType.isOptional || isNullable,
-                        isArray: propType.isArray,
-                        isRelation: false
-                    });
-                } else if (currentDecorators.some(d => d.includes('@CreateDateColumn') || d.includes('@UpdateDateColumn'))) {
-                    properties.push({
-                        name: propName,
-                        type: 'string',
-                        isOptional: false,
-                        isArray: false,
-                        isRelation: false
-                    });
-                } else if (currentDecorators.some(d => d.includes('@DeleteDateColumn'))) {
-                    properties.push({
-                        name: propName,
-                        type: 'string',
-                        isOptional: true,
-                        isArray: false,
-                        isRelation: false
-                    });
-                } else if (currentDecorators.some(d => d.includes('@OneToMany') || d.includes('@ManyToOne') || d.includes('@ManyToMany'))) {
-                    const relationType = currentDecorators.find(d => d.includes('@OneToMany') || d.includes('@ManyToOne') || d.includes('@ManyToMany'));
-                    let targetEntity = '';
-                    let isArray = false;
-                    
-                    if (relationType?.includes('@OneToMany') || relationType?.includes('@ManyToMany')) {
-                        isArray = true;
-                        const arrayMatch = propTypeRaw.match(/(\w+)\[\]/);
-                        if (arrayMatch) {
-                            targetEntity = arrayMatch[1];
-                        }
-                    } else {
-                        targetEntity = propTypeRaw;
+        if (isChildEntity && classNode.heritageClauses) {
+            for (const heritage of classNode.heritageClauses) {
+                if (heritage.token === ts.SyntaxKind.ExtendsKeyword) {
+                    const extendsType = heritage.types[0];
+                    if (ts.isIdentifier(extendsType.expression)) {
+                        parentEntity = extendsType.expression.text;
                     }
-
-                    properties.push({
-                        name: propName,
-                        type: targetEntity,
-                        isOptional: true,
-                        isArray,
-                        isRelation: true,
-                        relationTarget: targetEntity
-                    });
                 }
-                
-                currentDecorators = [];
-            } else if (!line.startsWith('@') && line.length > 0) {
-                // Reset decorators if we hit a non-decorator, non-property line
-                currentDecorators = [];
             }
         }
-
-        // Parse computed properties (@Expose getters) only from this class
-        const computedMatches = classBody.matchAll(/@Expose\(\)\s*get\s+(\w+)\(\):\s*([^{]+)\s*{/g);
-        for (const match of computedMatches) {
-            const propName = match[1];
-            const returnType = this.mapTypeOrmTypeToTS(match[2].trim());
-            computedProperties.push({
-                name: propName,
-                type: returnType.type,
-                isOptional: false,
-                isArray: returnType.isArray,
-                isRelation: false
-            });
+        
+        // Parse class members
+        for (const member of classNode.members) {
+            if (ts.isPropertyDeclaration(member) && member.name && ts.isIdentifier(member.name)) {
+                const property = this.parseProperty(member, sourceFile);
+                if (property) {
+                    properties.push(property);
+                    console.log(`  📝 Property: ${property.name} (${property.type}${property.isOptional ? '?' : ''}${property.isArray ? '[]' : ''})`);
+                }
+            } else if (ts.isGetAccessorDeclaration(member) && member.name && ts.isIdentifier(member.name)) {
+                const computedProperty = this.parseComputedProperty(member, sourceFile);
+                if (computedProperty) {
+                    computedProperties.push(computedProperty);
+                    console.log(`  ⚡ Computed: ${computedProperty.name} (${computedProperty.type})`);
+                }
+            }
         }
-
+        
         return {
             name: entityName,
             properties,
@@ -230,35 +145,260 @@ class TypeGenerator {
         };
     }
 
-    private mapTypeOrmTypeToTS(typeormType: string): { type: string; isOptional: boolean; isArray: boolean } {
-        let type = typeormType;
-        let isOptional = false;
-        let isArray = false;
-
-        // Handle optional types
-        if (type.includes('| null')) {
-            isOptional = true;
-            type = type.replace('| null', '').trim();
+    private parseProperty(propertyNode: ts.PropertyDeclaration, sourceFile: ts.SourceFile): EntityProperty | null {
+        if (!propertyNode.name || !ts.isIdentifier(propertyNode.name)) return null;
+        
+        const propertyName = propertyNode.name.text;
+        const decorators = this.getDecorators(propertyNode);
+        
+        // Skip if no relevant decorators
+        if (decorators.length === 0) return null;
+        
+        // Skip excluded properties
+        if (decorators.some(d => d.name === 'Exclude')) {
+            console.log(`  ❌ Skipping excluded property: ${propertyName}`);
+            return null;
         }
+        
+        const isOptionalFromSyntax = !!propertyNode.questionToken;
+        const typeInfo = this.getPropertyType(propertyNode);
+        
+        // Handle @PrimaryGeneratedColumn
+        if (decorators.some(d => d.name === 'PrimaryGeneratedColumn')) {
+            return {
+                name: propertyName,
+                type: 'number',
+                isOptional: false,
+                isArray: false,
+                isRelation: false
+            };
+        }
+        
+        // Handle @Column decorators
+        const columnDecorator = decorators.find(d => d.name === 'Column');
+        if (columnDecorator) {
+            const isNullable = this.isColumnNullable(columnDecorator);
+            const mappedType = this.mapTypeToTS(typeInfo.type, columnDecorator);
+            
+            return {
+                name: propertyName,
+                type: mappedType.type,
+                isOptional: isOptionalFromSyntax || typeInfo.isOptional || isNullable,
+                isArray: mappedType.isArray,
+                isRelation: false
+            };
+        }
+        
+        // Handle date columns
+        if (decorators.some(d => ['CreateDateColumn', 'UpdateDateColumn'].includes(d.name))) {
+            return {
+                name: propertyName,
+                type: 'string',
+                isOptional: false,
+                isArray: false,
+                isRelation: false
+            };
+        }
+        
+        if (decorators.some(d => d.name === 'DeleteDateColumn')) {
+            return {
+                name: propertyName,
+                type: 'string',
+                isOptional: true,
+                isArray: false,
+                isRelation: false
+            };
+        }
+        
+        // Handle relations
+        const relationDecorator = decorators.find(d => 
+            ['OneToMany', 'ManyToOne', 'ManyToMany'].includes(d.name)
+        );
+        
+        if (relationDecorator) {
+            const isArray = ['OneToMany', 'ManyToMany'].includes(relationDecorator.name);
+            const targetEntity = this.extractRelationTarget(typeInfo.type, isArray);
+            
+            return {
+                name: propertyName,
+                type: targetEntity,
+                isOptional: true,
+                isArray,
+                isRelation: true,
+                relationTarget: targetEntity
+            };
+        }
+        
+        return null;
+    }
 
+    private parseComputedProperty(getterNode: ts.GetAccessorDeclaration, sourceFile: ts.SourceFile): EntityProperty | null {
+        if (!getterNode.name || !ts.isIdentifier(getterNode.name)) return null;
+        
+        const propertyName = getterNode.name.text;
+        const decorators = this.getDecorators(getterNode);
+        
+        // Only include properties with @Expose decorator
+        if (!decorators.some(d => d.name === 'Expose')) {
+            return null;
+        }
+        
+        const returnType = this.getReturnType(getterNode);
+        
+        return {
+            name: propertyName,
+            type: returnType,
+            isOptional: false,
+            isArray: false,
+            isRelation: false
+        };
+    }
+
+    private hasDecorator(node: ts.Node, decoratorNames: string[]): boolean {
+        // Use modifiers to access decorators for compatibility
+        const modifiers = (node as any).modifiers || (node as any).decorators;
+        if (!modifiers) return false;
+        
+        return modifiers.some((modifier: any) => {
+            if (modifier.kind === ts.SyntaxKind.Decorator) {
+                const decorator = modifier;
+                if (ts.isCallExpression(decorator.expression)) {
+                    const expression = decorator.expression.expression;
+                    if (ts.isIdentifier(expression)) {
+                        return decoratorNames.includes(expression.text);
+                    }
+                } else if (ts.isIdentifier(decorator.expression)) {
+                    return decoratorNames.includes(decorator.expression.text);
+                }
+            }
+            return false;
+        });
+    }
+
+    private getDecorators(node: ts.Node): Array<{name: string, args: any[]}> {
+        // Use modifiers to access decorators for compatibility
+        const modifiers = (node as any).modifiers || (node as any).decorators;
+        if (!modifiers) return [];
+        
+        return modifiers
+            .filter((modifier: any) => modifier.kind === ts.SyntaxKind.Decorator)
+            .map((decorator: any) => {
+                let name = '';
+                let args: any[] = [];
+                
+                if (ts.isCallExpression(decorator.expression)) {
+                    const expression = decorator.expression.expression;
+                    if (ts.isIdentifier(expression)) {
+                        name = expression.text;
+                    }
+                    args = decorator.expression.arguments.map((arg: any) => arg.getText());
+                } else if (ts.isIdentifier(decorator.expression)) {
+                    name = decorator.expression.text;
+                }
+                
+                return { name, args };
+            })
+            .filter((d: any) => d.name);
+    }
+
+    private getPropertyType(propertyNode: ts.PropertyDeclaration): {type: string, isOptional: boolean} {
+        if (!propertyNode.type) {
+            return { type: 'any', isOptional: false };
+        }
+        
+        const typeText = propertyNode.type.getText();
+        const isOptional = typeText.includes('| null');
+        
+        return {
+            type: typeText,
+            isOptional
+        };
+    }
+
+    private isColumnNullable(columnDecorator: {name: string, args: any[]}): boolean {
+        return columnDecorator.args.some(arg => 
+            arg.includes('nullable: true') || arg.includes('nullable:true')
+        );
+    }
+
+    private mapTypeToTS(typeText: string, columnDecorator?: {name: string, args: any[]}): {type: string, isArray: boolean} {
         // Handle arrays
-        if (type.includes('[]')) {
-            isArray = true;
-            type = type.replace('[]', '').trim();
+        if (typeText.includes('[]')) {
+            const baseType = typeText.replace('[]', '').replace('| null', '').trim();
+            return {
+                type: this.mapSingleTypeToTS(baseType, columnDecorator),
+                isArray: true
+            };
         }
+        
+        // Handle union with null
+        const cleanType = typeText.replace('| null', '').trim();
+        
+        return {
+            type: this.mapSingleTypeToTS(cleanType, columnDecorator),
+            isArray: false
+        };
+    }
 
-        // Map TypeORM types to TypeScript types
-        switch (type) {
+    private mapSingleTypeToTS(typeText: string, columnDecorator?: {name: string, args: any[]}): string {
+        // Check column decorator for specific types
+        if (columnDecorator) {
+            const hasDateTimeType = columnDecorator.args.some(arg => 
+                arg.includes("'datetime'") || arg.includes("'date'") || arg.includes("'timestamp'")
+            );
+            if (hasDateTimeType) {
+                return 'string';
+            }
+            
+            const hasJsonType = columnDecorator.args.some(arg => 
+                arg.includes("'json'") || arg.includes("'simple-json'") || arg.includes("type: 'simple-json'")
+            );
+            if (hasJsonType) {
+                return 'any';
+            }
+        }
+        
+        // Map TypeScript types
+        switch (typeText) {
             case 'Date':
-                return { type: 'string', isOptional, isArray };
+                return 'string';
             case 'string':
             case 'number':
             case 'boolean':
-                return { type, isOptional, isArray };
+                return typeText;
+            case 'IMedia':
+                return 'IMedia';
             default:
-                // For custom types and enums, keep as is
-                return { type, isOptional, isArray };
+                // For custom types, keep as is
+                return typeText;
         }
+    }
+
+    private extractRelationTarget(typeText: string, isArray: boolean): string {
+        if (isArray) {
+            // Extract from Type[]
+            const match = typeText.match(/(\w+)\[\]/);
+            return match ? match[1] : 'any';
+        } else {
+            // Extract from Type | null or just Type
+            const cleanType = typeText.replace('| null', '').trim();
+            return cleanType || 'any';
+        }
+    }
+
+    private getReturnType(getterNode: ts.GetAccessorDeclaration): string {
+        if (getterNode.type) {
+            const typeText = getterNode.type.getText();
+            switch (typeText) {
+                case 'boolean':
+                case 'string':
+                case 'number':
+                    return typeText;
+                default:
+                    return 'any';
+            }
+        }
+        return 'any';
     }
 
     private async generateEntityTypes() {
@@ -281,32 +421,11 @@ class TypeGenerator {
 
         // Add imports for related entities and enums
         const relatedEntities = new Set<string>();
+        const relatedEnums = new Set<string>();
         const needsIMedia = entityInfo.properties.some(p => p.type === 'IMedia');
-        const needsUserType = entityInfo.properties.some(p => p.type === 'UserType') || 
-                             entityInfo.computedProperties.some(p => p.type === 'UserType');
 
         if (needsIMedia) {
-            imports.push("import { IMedia } from '../../interfaces';");
-        }
-
-        if (needsUserType) {
-            imports.push("import { UserType } from '../enums';");
-        }
-
-        // Collect related entities for imports
-        for (const prop of entityInfo.properties) {
-            if (prop.isRelation && prop.relationTarget && prop.relationTarget !== entityInfo.name) {
-                // Clean the relation target to remove any union type syntax
-                const cleanTarget = prop.relationTarget.replace(/\s*\|\s*null/g, '').trim();
-                if (cleanTarget) {
-                    relatedEntities.add(cleanTarget);
-                }
-            }
-        }
-
-        // Add imports for related entities
-        for (const relatedEntity of relatedEntities) {
-            imports.push(`import { ${relatedEntity} } from './${relatedEntity}';`);
+            imports.push("import type { IMedia } from '../../interfaces';");
         }
 
         // Generate interface
@@ -316,6 +435,16 @@ class TypeGenerator {
         if (entityInfo.isChildEntity && entityInfo.parentEntity) {
             const parentEntity = this.entities.get(entityInfo.parentEntity);
             if (parentEntity) {
+                // Add parent's imports
+                for (const prop of parentEntity.properties) {
+                    if (prop.isRelation && prop.relationTarget && prop.relationTarget !== entityInfo.name) {
+                        relatedEntities.add(prop.relationTarget);
+                    }
+                    if (prop.type === 'UserType' || prop.type === 'CategoryType') {
+                        relatedEnums.add(prop.type);
+                    }
+                }
+                
                 for (const prop of parentEntity.properties) {
                     const optionalMark = prop.isOptional ? '?' : '';
                     const arrayMark = prop.isArray ? '[]' : '';
@@ -327,6 +456,28 @@ class TypeGenerator {
                     interfaceLines.push(`    ${prop.name}${optionalMark}: ${prop.type}${arrayMark};`);
                 }
             }
+        }
+
+        // Collect related entities and enums for imports
+        for (const prop of entityInfo.properties) {
+            if (prop.isRelation && prop.relationTarget && prop.relationTarget !== entityInfo.name) {
+                relatedEntities.add(prop.relationTarget);
+            }
+            // Check for enum types
+            if (prop.type === 'UserType' || prop.type === 'CategoryType') {
+                relatedEnums.add(prop.type);
+            }
+        }
+
+        // Add imports for related entities
+        for (const relatedEntity of relatedEntities) {
+            imports.push(`import type { ${relatedEntity} } from './${relatedEntity}';`);
+        }
+
+        // Add imports for enums
+        if (relatedEnums.size > 0) {
+            const enumImports = Array.from(relatedEnums).join(', ');
+            imports.push(`import type { ${enumImports} } from '../enums';`);
         }
 
         // Add entity-specific properties
@@ -357,23 +508,29 @@ class TypeGenerator {
 
     private async updateApiTypes() {
         const apiTypesPath = path.join(this.outputPath, 'src/types/api/index.ts');
+        
+        if (!fs.existsSync(apiTypesPath)) {
+            console.log('⚠️  API types file not found, skipping update');
+            return;
+        }
+        
         let content = fs.readFileSync(apiTypesPath, 'utf-8');
 
-        // Only add imports if they don't already exist
-        if (!content.includes("import { IMedia } from '../../interfaces';")) {
-            const imports = [
-                "import { IMedia } from '../../interfaces';",
-                "import { UserType } from '../enums';",
-                "import { User } from '../entities/User';"
-            ];
+        // Remove existing imports and add clean ones
+        const lines = content.split('\n');
+        const nonImportLines = lines.filter(line => !line.trim().startsWith('import'));
+        
+        const imports = [
+            "import type { IMedia } from '../../interfaces';",
+            "import type { User } from '../entities/User';",
+            "import type { UserType } from '../enums';"
+        ];
 
-            content = imports.join('\n') + '\n\n' + content;
-        }
+        content = imports.join('\n') + '\n\n' + nonImportLines.join('\n');
 
         // Replace placeholder types
         content = content.replace(/user: any;/g, 'user: User;');
         content = content.replace(/media\?: any\[\];/g, 'media?: IMedia[];');
-        content = content.replace(/type: string;/g, 'type: UserType;');
 
         fs.writeFileSync(apiTypesPath, content);
         console.log('Updated API types with proper references');
@@ -387,6 +544,10 @@ class TypeGenerator {
             "export * from './entities';",
             "export * from './enums';"
         ].join('\n');
+        
+        if (!fs.existsSync(path.dirname(typesIndexPath))) {
+            fs.mkdirSync(path.dirname(typesIndexPath), { recursive: true });
+        }
         fs.writeFileSync(typesIndexPath, typesIndexContent);
 
         // Generate entities index
@@ -396,10 +557,15 @@ class TypeGenerator {
             .join('\n');
         fs.writeFileSync(entitiesIndexPath, entityExports);
 
-        // Generate utils index
+        // Generate utils index if it doesn't exist
         const utilsIndexPath = path.join(this.outputPath, 'src/utils/index.ts');
-        const utilsIndexContent = "export * from './permissions';";
-        fs.writeFileSync(utilsIndexPath, utilsIndexContent);
+        if (!fs.existsSync(utilsIndexPath)) {
+            const utilsIndexContent = "export * from './permissions';";
+            if (!fs.existsSync(path.dirname(utilsIndexPath))) {
+                fs.mkdirSync(path.dirname(utilsIndexPath), { recursive: true });
+            }
+            fs.writeFileSync(utilsIndexPath, utilsIndexContent);
+        }
 
         // Generate main index
         const mainIndexPath = path.join(this.outputPath, 'src/index.ts');

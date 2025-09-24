@@ -3,3 +3,8 @@ export enum UserType {
     VISITOR = 'Visitor',
     RESIDENT = 'Resident'
 }
+
+export enum CategoryType {
+    PLACE = 'Place',
+    EVENT = 'Event',
+}
