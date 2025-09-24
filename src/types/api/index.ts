@@ -1,7 +1,3 @@
-import type { IMedia } from '../../interfaces';
-import type { User } from '../entities/User';
-import type { UserType } from '../enums';
-
 // API Response Types
 export interface ApiResponse<T = any> {
     success: boolean;
@@ -31,7 +27,7 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-    user: User;
+    user: any; // Will be replaced with User type by generator
     token: string;
     refreshToken?: string;
 }
@@ -74,7 +70,7 @@ export interface PlaceFormData {
     coordinates?: string;
     featureStartsOn?: string;
     featureEndsOn?: string;
-    media?: IMedia[];
+    media?: any[]; // Will be replaced with IMedia[] by generator
     categories?: number[];
 }
 
@@ -89,7 +85,7 @@ export interface EventFormData {
     endsOn: string;
     featureStartsOn?: string;
     featureEndsOn?: string;
-    media?: IMedia[];
+    media?: any[]; // Will be replaced with IMedia[] by generator
     categories?: number[];
 }
 
@@ -99,7 +95,7 @@ export interface UserFormData {
     firstName: string;
     lastName: string;
     birthdate?: string;
-    type: UserType;
+    type: any; // Will be replaced with UserType by generator
     roleId?: number;
     permissions?: string[];
 }

@@ -40,11 +40,11 @@ class TypeGenerator {
         // Generate enum files
         await this.generateEnumTypes();
         
+        // Generate API interface files
+        await this.generateApiInterfaces();
+        
         // Generate type files
         await this.generateEntityTypes();
-        
-        // Update API types with proper references
-        await this.updateApiTypes();
         
         // Generate main index files
         await this.generateIndexFiles();
@@ -436,6 +436,66 @@ class TypeGenerator {
         }
     }
 
+    private async generateApiInterfaces() {
+        const apiDir = path.join(this.outputPath, 'src/types/api');
+        if (!fs.existsSync(apiDir)) {
+            fs.mkdirSync(apiDir, { recursive: true });
+        }
+
+        const interfacesPath = path.join(this.apiPath, 'src/interfaces');
+        if (!fs.existsSync(interfacesPath)) {
+            console.log('⚠️  No interfaces directory found, skipping API interface generation');
+            return;
+        }
+
+        const files = fs.readdirSync(interfacesPath).filter(file => file.endsWith('.ts'));
+
+        const allInterfaces: string[] = [];
+
+        for (const file of files) {
+            const filePath = path.join(interfacesPath, file);
+            const content = fs.readFileSync(filePath, 'utf-8');
+            
+            // Use TypeScript AST to parse interfaces properly
+            const sourceFile = ts.createSourceFile(
+                filePath,
+                content,
+                ts.ScriptTarget.Latest,
+                true
+            );
+            
+            const interfaces = this.parseInterfaceFile(sourceFile);
+            allInterfaces.push(...interfaces);
+        }
+
+        if (allInterfaces.length > 0) {
+            const interfaceContent = allInterfaces.join('\n\n');
+            const apiFilePath = path.join(apiDir, 'index.ts');
+            fs.writeFileSync(apiFilePath, interfaceContent);
+            console.log(`Generated API interfaces: ${allInterfaces.length} interfaces`);
+        }
+    }
+
+    private parseInterfaceFile(sourceFile: ts.SourceFile): string[] {
+        const interfaces: string[] = [];
+        
+        const visit = (node: ts.Node) => {
+            if (ts.isInterfaceDeclaration(node) && node.name) {
+                // Skip IMedia as it's handled separately in the main interfaces
+                if (node.name.text === 'IMedia') {
+                    return;
+                }
+                // Get the full text of the interface declaration
+                const interfaceText = node.getFullText(sourceFile).trim();
+                interfaces.push(interfaceText);
+            }
+            ts.forEachChild(node, visit);
+        };
+        
+        visit(sourceFile);
+        return interfaces;
+    }
+
     private async generateEntityTypes() {
         const entitiesDir = path.join(this.outputPath, 'src/types/entities');
         if (!fs.existsSync(entitiesDir)) {
@@ -554,7 +614,9 @@ class TypeGenerator {
 
         // Remove existing imports and add clean ones
         const lines = content.split('\n');
-        const nonImportLines = lines.filter(line => !line.trim().startsWith('import'));
+        const nonImportLines = lines.filter(line => 
+            !line.trim().startsWith('import') && line.trim() !== ''
+        );
         
         // Dynamically discover required imports based on content
         const imports = this.discoverRequiredImports(content);
