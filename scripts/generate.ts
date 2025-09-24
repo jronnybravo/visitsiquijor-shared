@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as ts from 'typescript';
+import { argv } from 'process';
 
 interface EntityProperty {
     name: string;
@@ -34,6 +35,9 @@ class TypeGenerator {
         
         // Parse all entity files using TypeScript compiler
         await this.parseEntities();
+        
+        // Generate enum files
+        await this.generateEnumTypes();
         
         // Generate type files
         await this.generateEntityTypes();
@@ -401,6 +405,36 @@ class TypeGenerator {
         return 'any';
     }
 
+    private async generateEnumTypes() {
+        const enumsDir = path.join(this.outputPath, 'src/types/enums');
+        if (!fs.existsSync(enumsDir)) {
+            fs.mkdirSync(enumsDir, { recursive: true });
+        }
+
+        const entitiesPath = path.join(this.apiPath, 'src/entities');
+        const files = fs.readdirSync(entitiesPath).filter(file => file.endsWith('.ts'));
+
+        const allEnums: string[] = [];
+
+        for (const file of files) {
+            const filePath = path.join(entitiesPath, file);
+            const content = fs.readFileSync(filePath, 'utf-8');
+            
+            // Extract enum declarations using regex
+            const enumMatches = content.match(/export enum \w+ \{[\s\S]*?\}/g);
+            if (enumMatches) {
+                allEnums.push(...enumMatches);
+            }
+        }
+
+        if (allEnums.length > 0) {
+            const enumContent = allEnums.join('\n\n');
+            const enumFilePath = path.join(enumsDir, 'index.ts');
+            fs.writeFileSync(enumFilePath, enumContent);
+            console.log(`Generated enums: ${allEnums.length} enums`);
+        }
+    }
+
     private async generateEntityTypes() {
         const entitiesDir = path.join(this.outputPath, 'src/types/entities');
         if (!fs.existsSync(entitiesDir)) {
@@ -670,15 +704,14 @@ class TypeGenerator {
 
 // Main execution
 async function main() {
-    const apiPath = process.argv[2] || '../';
-    const outputPath = process.argv[3] || './';
+    const apiPath = argv[2] || '../';
+    const outputPath = argv[3] || './';
 
     const generator = new TypeGenerator(apiPath, outputPath);
     await generator.generate();
 }
 
-if (require.main === module) {
-    main().catch(console.error);
-}
+// Run main if this file is executed directly
+main().catch(console.error);
 
 export { TypeGenerator };
