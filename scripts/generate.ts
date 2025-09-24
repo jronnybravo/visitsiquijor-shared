@@ -43,6 +43,12 @@ class TypeGenerator {
         // Generate API interface files
         await this.generateApiInterfaces();
         
+        // Copy interfaces directory
+        await this.copyInterfaces();
+        
+        // Copy utils directory
+        await this.copyUtils();
+        
         // Generate type files
         await this.generateEntityTypes();
         
@@ -496,6 +502,69 @@ class TypeGenerator {
         return interfaces;
     }
 
+    private async copyInterfaces() {
+        const sourceInterfacesPath = path.join(this.apiPath, 'src/interfaces');
+        const targetInterfacesPath = path.join(this.outputPath, 'src/interfaces');
+        
+        if (!fs.existsSync(sourceInterfacesPath)) {
+            console.log('⚠️  No source interfaces directory found, skipping interface copy');
+            return;
+        }
+        
+        // Create target directory
+        if (!fs.existsSync(targetInterfacesPath)) {
+            fs.mkdirSync(targetInterfacesPath, { recursive: true });
+        }
+        
+        // Copy all interface files except ApiInterfaces.ts (which is handled by generateApiInterfaces)
+        const files = fs.readdirSync(sourceInterfacesPath).filter(file => 
+            file.endsWith('.ts') && file !== 'ApiInterfaces.ts'
+        );
+        
+        for (const file of files) {
+            const sourceFile = path.join(sourceInterfacesPath, file);
+            const targetFile = path.join(targetInterfacesPath, file);
+            fs.copyFileSync(sourceFile, targetFile);
+            console.log(`Copied interface: ${file}`);
+        }
+        
+        // Generate interfaces index
+        const indexContent = files
+            .map(file => `export * from './${path.basename(file, '.ts')}';`)
+            .join('\n');
+        const indexPath = path.join(targetInterfacesPath, 'index.ts');
+        fs.writeFileSync(indexPath, indexContent);
+        
+        console.log(`Generated interfaces index with ${files.length} interfaces`);
+    }
+
+    private async copyUtils() {
+        const sourceUtilsPath = path.join(this.apiPath, 'src/utils');
+        const targetUtilsPath = path.join(this.outputPath, 'src/utils');
+        
+        if (!fs.existsSync(sourceUtilsPath)) {
+            console.log('⚠️  No source utils directory found, skipping utils copy');
+            return;
+        }
+        
+        // Create target directory
+        if (!fs.existsSync(targetUtilsPath)) {
+            fs.mkdirSync(targetUtilsPath, { recursive: true });
+        }
+        
+        // Copy all utility files
+        const files = fs.readdirSync(sourceUtilsPath).filter(file => file.endsWith('.ts'));
+        
+        for (const file of files) {
+            const sourceFile = path.join(sourceUtilsPath, file);
+            const targetFile = path.join(targetUtilsPath, file);
+            fs.copyFileSync(sourceFile, targetFile);
+            console.log(`Copied utility: ${file}`);
+        }
+        
+        console.log(`Copied ${files.length} utilities`);
+    }
+
     private async generateEntityTypes() {
         const entitiesDir = path.join(this.outputPath, 'src/types/entities');
         if (!fs.existsSync(entitiesDir)) {
@@ -652,13 +721,15 @@ class TypeGenerator {
             .join('\n');
         fs.writeFileSync(entitiesIndexPath, entityExports);
 
-        // Generate utils index - discover subdirectories dynamically
+        // Generate utils index - discover files dynamically
         const utilsIndexPath = path.join(this.outputPath, 'src/utils/index.ts');
         const utilsDir = path.dirname(utilsIndexPath);
         if (fs.existsSync(utilsDir)) {
-            const utilsSubdirs = this.getSubdirectories(utilsDir);
-            const utilsIndexContent = utilsSubdirs
-                .map(subdir => `export * from './${subdir}';`)
+            const utilsFiles = fs.readdirSync(utilsDir)
+                .filter(file => file.endsWith('.ts') && file !== 'index.ts')
+                .map(file => path.basename(file, '.ts'));
+            const utilsIndexContent = utilsFiles
+                .map(file => `export * from './${file}';`)
                 .join('\n');
             fs.writeFileSync(utilsIndexPath, utilsIndexContent);
         }

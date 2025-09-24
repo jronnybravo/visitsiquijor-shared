@@ -1,4 +1,5 @@
 abstract class BasePermission {
+
     static getPermissionPath(permission: string): string[] {
         const hierarchy = (this as any).getHierarchy();
         const stack: [Record<string, any>, string[]][] = [[hierarchy, []]];
@@ -107,5 +108,3 @@ export class AdministratorPermission extends BasePermission {
         };
     }
 }
-
-export { BasePermission };
