@@ -3,7 +3,6 @@ import type { RefreshToken } from './RefreshToken';
 import type { PlaceBookmark } from './PlaceBookmark';
 import type { EventBookmark } from './EventBookmark';
 import type { AccessLog } from './AccessLog';
-import type { UserType } from '../enums';
 
 export interface Resident {
     id: number;

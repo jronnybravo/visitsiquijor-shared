@@ -9,7 +9,6 @@ import type { Event } from './Event';
 import type { Card } from './Card';
 import type { Advertisement } from './Advertisement';
 import type { Article } from './Article';
-import type { UserType } from '../enums';
 
 export interface Administrator {
     id: number;

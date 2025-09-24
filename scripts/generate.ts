@@ -440,7 +440,7 @@ class TypeGenerator {
                     if (prop.isRelation && prop.relationTarget && prop.relationTarget !== entityInfo.name) {
                         relatedEntities.add(prop.relationTarget);
                     }
-                    if (prop.type === 'UserType' || prop.type === 'CategoryType') {
+                    if (this.isEnumType(prop.type)) {
                         relatedEnums.add(prop.type);
                     }
                 }
@@ -464,7 +464,7 @@ class TypeGenerator {
                 relatedEntities.add(prop.relationTarget);
             }
             // Check for enum types
-            if (prop.type === 'UserType' || prop.type === 'CategoryType') {
+            if (this.isEnumType(prop.type)) {
                 relatedEnums.add(prop.type);
             }
         }
@@ -497,7 +497,7 @@ class TypeGenerator {
         interfaceLines.push('}');
 
         // Combine imports and interface
-        const result = [];
+        const result: string[] = [];
         if (imports.length > 0) {
             result.push(...imports, '');
         }
@@ -520,11 +520,8 @@ class TypeGenerator {
         const lines = content.split('\n');
         const nonImportLines = lines.filter(line => !line.trim().startsWith('import'));
         
-        const imports = [
-            "import type { IMedia } from '../../interfaces';",
-            "import type { User } from '../entities/User';",
-            "import type { UserType } from '../enums';"
-        ];
+        // Dynamically discover required imports based on content
+        const imports = this.discoverRequiredImports(content);
 
         content = imports.join('\n') + '\n\n' + nonImportLines.join('\n');
 
@@ -537,16 +534,16 @@ class TypeGenerator {
     }
 
     private async generateIndexFiles() {
-        // Generate main types index
+        // Generate main types index - discover subdirectories dynamically
         const typesIndexPath = path.join(this.outputPath, 'src/types/index.ts');
-        const typesIndexContent = [
-            "export * from './api';",
-            "export * from './entities';",
-            "export * from './enums';"
-        ].join('\n');
+        const typesDir = path.dirname(typesIndexPath);
+        const typesSubdirs = this.getSubdirectories(typesDir);
+        const typesIndexContent = typesSubdirs
+            .map(subdir => `export * from './${subdir}';`)
+            .join('\n');
         
-        if (!fs.existsSync(path.dirname(typesIndexPath))) {
-            fs.mkdirSync(path.dirname(typesIndexPath), { recursive: true });
+        if (!fs.existsSync(typesDir)) {
+            fs.mkdirSync(typesDir, { recursive: true });
         }
         fs.writeFileSync(typesIndexPath, typesIndexContent);
 
@@ -557,26 +554,90 @@ class TypeGenerator {
             .join('\n');
         fs.writeFileSync(entitiesIndexPath, entityExports);
 
-        // Generate utils index if it doesn't exist
+        // Generate utils index - discover subdirectories dynamically
         const utilsIndexPath = path.join(this.outputPath, 'src/utils/index.ts');
-        if (!fs.existsSync(utilsIndexPath)) {
-            const utilsIndexContent = "export * from './permissions';";
-            if (!fs.existsSync(path.dirname(utilsIndexPath))) {
-                fs.mkdirSync(path.dirname(utilsIndexPath), { recursive: true });
-            }
+        const utilsDir = path.dirname(utilsIndexPath);
+        if (fs.existsSync(utilsDir)) {
+            const utilsSubdirs = this.getSubdirectories(utilsDir);
+            const utilsIndexContent = utilsSubdirs
+                .map(subdir => `export * from './${subdir}';`)
+                .join('\n');
             fs.writeFileSync(utilsIndexPath, utilsIndexContent);
         }
 
-        // Generate main index
+        // Generate main index - discover subdirectories dynamically
         const mainIndexPath = path.join(this.outputPath, 'src/index.ts');
-        const mainIndexContent = [
-            "export * from './types';",
-            "export * from './utils';",
-            "export * from './interfaces';"
-        ].join('\n');
+        const srcDir = path.dirname(mainIndexPath);
+        const srcSubdirs = this.getSubdirectories(srcDir);
+        const mainIndexContent = srcSubdirs
+            .map(subdir => `export * from './${subdir}';`)
+            .join('\n');
         fs.writeFileSync(mainIndexPath, mainIndexContent);
 
         console.log('Generated index files');
+    }
+
+    private getSubdirectories(dirPath: string): string[] {
+        if (!fs.existsSync(dirPath)) {
+            return [];
+        }
+        
+        return fs.readdirSync(dirPath, { withFileTypes: true })
+            .filter(dirent => dirent.isDirectory())
+            .map(dirent => dirent.name)
+            .sort();
+    }
+
+    private discoverRequiredImports(content: string): string[] {
+        const imports: string[] = [];
+        
+        // Check for IMedia usage
+        if (content.includes('IMedia')) {
+            imports.push("import type { IMedia } from '../../interfaces';");
+        }
+        
+        // Check for User usage
+        if (content.includes(': User')) {
+            imports.push("import type { User } from '../entities/User';");
+        }
+        
+        // Dynamically discover enum usage
+        const enumTypes = this.discoverEnumTypes(content);
+        if (enumTypes.length > 0) {
+            const enumImports = enumTypes.join(', ');
+            imports.push(`import type { ${enumImports} } from '../enums';`);
+        }
+        
+        return imports;
+    }
+
+    private isEnumType(typeName: string): boolean {
+        // Check if this type exists in the enums directory
+        const enumsDir = path.join(this.outputPath, 'src/types/enums');
+        if (fs.existsSync(enumsDir)) {
+            const enumFiles = fs.readdirSync(enumsDir).filter(file => file.endsWith('.ts') && file !== 'index.ts');
+            return enumFiles.some(file => path.basename(file, '.ts') === typeName);
+        }
+        return false;
+    }
+
+    private discoverEnumTypes(content: string): string[] {
+        const enumTypes: string[] = [];
+        
+        // Get all available enum types from the enums directory
+        const enumsDir = path.join(this.outputPath, 'src/types/enums');
+        if (fs.existsSync(enumsDir)) {
+            const enumFiles = fs.readdirSync(enumsDir).filter(file => file.endsWith('.ts') && file !== 'index.ts');
+            
+            for (const enumFile of enumFiles) {
+                const enumName = path.basename(enumFile, '.ts');
+                if (content.includes(enumName)) {
+                    enumTypes.push(enumName);
+                }
+            }
+        }
+        
+        return enumTypes;
     }
 }
 
