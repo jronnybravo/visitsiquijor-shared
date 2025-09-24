@@ -615,8 +615,19 @@ class TypeGenerator {
         // Check if this type exists in the enums directory
         const enumsDir = path.join(this.outputPath, 'src/types/enums');
         if (fs.existsSync(enumsDir)) {
+            // Check individual enum files first
             const enumFiles = fs.readdirSync(enumsDir).filter(file => file.endsWith('.ts') && file !== 'index.ts');
-            return enumFiles.some(file => path.basename(file, '.ts') === typeName);
+            if (enumFiles.some(file => path.basename(file, '.ts') === typeName)) {
+                return true;
+            }
+            
+            // Check if it's exported from the index file - use regex for exact match
+            const indexFile = path.join(enumsDir, 'index.ts');
+            if (fs.existsSync(indexFile)) {
+                const content = fs.readFileSync(indexFile, 'utf-8');
+                const enumRegex = new RegExp(`^export enum ${typeName}\\b`, 'm');
+                return enumRegex.test(content);
+            }
         }
         return false;
     }
@@ -627,12 +638,28 @@ class TypeGenerator {
         // Get all available enum types from the enums directory
         const enumsDir = path.join(this.outputPath, 'src/types/enums');
         if (fs.existsSync(enumsDir)) {
+            // Check individual enum files first
             const enumFiles = fs.readdirSync(enumsDir).filter(file => file.endsWith('.ts') && file !== 'index.ts');
             
             for (const enumFile of enumFiles) {
                 const enumName = path.basename(enumFile, '.ts');
                 if (content.includes(enumName)) {
                     enumTypes.push(enumName);
+                }
+            }
+            
+            // Check enums exported from the index file
+            const indexFile = path.join(enumsDir, 'index.ts');
+            if (fs.existsSync(indexFile)) {
+                const indexContent = fs.readFileSync(indexFile, 'utf-8');
+                const enumMatches = indexContent.match(/export enum (\w+)/g);
+                if (enumMatches) {
+                    for (const match of enumMatches) {
+                        const enumName = match.replace('export enum ', '');
+                        if (content.includes(enumName) && !enumTypes.includes(enumName)) {
+                            enumTypes.push(enumName);
+                        }
+                    }
                 }
             }
         }

@@ -4,6 +4,7 @@ import type { PlaceBookmark } from './PlaceBookmark';
 import type { EventBookmark } from './EventBookmark';
 import type { AccessLog } from './AccessLog';
 import type { Card } from './Card';
+import type { UserType } from '../enums';
 
 export interface Visitor {
     id: number;

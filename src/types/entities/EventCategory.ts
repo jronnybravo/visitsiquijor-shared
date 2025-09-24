@@ -1,4 +1,5 @@
 import type { Event } from './Event';
+import type { CategoryType } from '../enums';
 
 export interface EventCategory {
     id: number;
