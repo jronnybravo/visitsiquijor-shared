@@ -17,6 +17,7 @@ export interface Administrator {
     firstName: string;
     lastName: string;
     birthdate?: string;
+    nationality?: string;
     type: UserType;
     createdAt: string;
     updatedAt: string;

@@ -11,6 +11,7 @@ export interface User {
     firstName: string;
     lastName: string;
     birthdate?: string;
+    nationality?: string;
     type: UserType;
     createdAt: string;
     updatedAt: string;

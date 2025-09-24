@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import * as fs from 'fs';
 import * as path from 'path';
 import * as ts from 'typescript';
@@ -533,7 +534,8 @@ class TypeGenerator {
         // Combine imports and interface
         const result: string[] = [];
         if (imports.length > 0) {
-            result.push(...imports, '');
+            result.push(...imports);
+            result.push(''); // Add blank line only if there are imports
         }
         result.push(...interfaceLines);
 
@@ -557,7 +559,7 @@ class TypeGenerator {
         // Dynamically discover required imports based on content
         const imports = this.discoverRequiredImports(content);
 
-        content = imports.join('\n') + '\n\n' + nonImportLines.join('\n');
+        content = imports.join('\n') + (imports.length > 0 ? '\n\n' : '') + nonImportLines.join('\n');
 
         // Replace placeholder types
         content = content.replace(/user: any;/g, 'user: User;');

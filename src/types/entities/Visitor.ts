@@ -12,6 +12,7 @@ export interface Visitor {
     firstName: string;
     lastName: string;
     birthdate?: string;
+    nationality?: string;
     type: UserType;
     createdAt: string;
     updatedAt: string;
@@ -25,5 +26,4 @@ export interface Visitor {
     age: number;
     isAdult: boolean;
     cards?: Card[];
-    nationality?: string;
 }
