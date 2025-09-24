@@ -53,39 +53,67 @@ class TypeGenerator {
         for (const file of files) {
             const filePath = path.join(entitiesPath, file);
             const content = fs.readFileSync(filePath, 'utf-8');
-            const entityInfo = this.parseEntityFile(content, file);
-            if (entityInfo) {
+            const entityInfos = this.parseEntityFile(content, file);
+            for (const entityInfo of entityInfos) {
                 this.entities.set(entityInfo.name, entityInfo);
             }
         }
     }
 
-    private parseEntityFile(content: string, filename: string): EntityInfo | null {
-        const entityName = filename.replace('.ts', '');
+    private parseEntityFile(content: string, filename: string): EntityInfo[] {
+        const entities: EntityInfo[] = [];
         
         // Skip if not an entity file
         if (!content.includes('@Entity()') && !content.includes('@ChildEntity(')) {
-            return null;
+            return entities;
         }
 
+        // Find all entity classes in the file
+        const entityMatches = content.matchAll(/(?:@Entity\(\)|@ChildEntity\([^)]*\))\s*(?:@[^\n]*\s*)*export\s+class\s+(\w+)/g);
+        
+        for (const match of entityMatches) {
+            const entityName = match[1];
+            const entityInfo = this.parseEntityClass(content, entityName);
+            if (entityInfo) {
+                entities.push(entityInfo);
+            }
+        }
+
+        return entities;
+    }
+
+    private parseEntityClass(content: string, entityName: string): EntityInfo | null {
         const properties: EntityProperty[] = [];
         const computedProperties: EntityProperty[] = [];
         let isChildEntity = false;
         let parentEntity: string | undefined;
 
-        // Check if it's a child entity
-        const childEntityMatch = content.match(/@ChildEntity\([^)]*\)/);
-        if (childEntityMatch) {
-            isChildEntity = true;
-            // Find the parent class
-            const extendsMatch = content.match(/class\s+\w+\s+extends\s+(\w+)/);
-            if (extendsMatch) {
-                parentEntity = extendsMatch[1];
-            }
+        // Find the class definition
+        const classRegex = new RegExp(`(?:@Entity\\(\\)|@ChildEntity\\([^)]*\\))\\s*(?:@[^\\n]*\\s*)*export\\s+class\\s+${entityName}(?:\\s+extends\\s+(\\w+))?[^{]*{([^}]*(?:{[^}]*}[^}]*)*)}`, 's');
+        const classMatch = content.match(classRegex);
+        
+        if (!classMatch) {
+            return null;
         }
 
-        // Parse all property declarations more carefully
-        const lines = content.split('\n');
+        const classContent = classMatch[0];
+        const extendsClass = classMatch[1];
+        
+        // Check if it's a child entity
+        const childEntityMatch = classContent.match(/@ChildEntity\([^)]*\)/);
+        if (childEntityMatch) {
+            isChildEntity = true;
+            parentEntity = extendsClass;
+        }
+
+        // Parse properties only from the specific class content, not the entire file
+        const classBodyMatch = classContent.match(/{([^}]*(?:{[^}]*}[^}]*)*)}/s);
+        if (!classBodyMatch) {
+            return null;
+        }
+        
+        const classBody = classBodyMatch[1];
+        const lines = classBody.split('\n');
         let currentDecorators: string[] = [];
         
         for (let i = 0; i < lines.length; i++) {
@@ -179,8 +207,8 @@ class TypeGenerator {
             }
         }
 
-        // Parse computed properties (@Expose getters)
-        const computedMatches = content.matchAll(/@Expose\(\)\s*get\s+(\w+)\(\):\s*([^{]+)\s*{/g);
+        // Parse computed properties (@Expose getters) only from this class
+        const computedMatches = classBody.matchAll(/@Expose\(\)\s*get\s+(\w+)\(\):\s*([^{]+)\s*{/g);
         for (const match of computedMatches) {
             const propName = match[1];
             const returnType = this.mapTypeOrmTypeToTS(match[2].trim());
