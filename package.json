@@ -39,9 +39,9 @@
       "require": "./dist/types/index.js"
     },
     "./permissions": {
-      "types": "./dist/permissions/index.d.ts",
-      "import": "./dist/permissions/index.js",
-      "require": "./dist/permissions/index.js"
+      "types": "./dist/utils/permissions/index.d.ts",
+      "import": "./dist/utils/permissions/index.js",
+      "require": "./dist/utils/permissions/index.js"
     },
     "./interfaces": {
       "types": "./dist/interfaces/index.d.ts",
