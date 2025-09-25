@@ -5,7 +5,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Build outputs
-dist/
+# dist/ - commented out for shared package distribution
 build/
 *.tsbuildinfo
 

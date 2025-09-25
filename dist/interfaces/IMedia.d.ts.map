@@ -1,0 +1,1 @@
+{"version":3,"file":"IMedia.d.ts","sourceRoot":"","sources":["../../src/interfaces/IMedia.ts"],"names":[],"mappings":"AAAA,MAAM,WAAW,MAAM;IACnB,IAAI,CAAC,EAAE,MAAM,CAAC;IACd,WAAW,CAAC,EAAE,MAAM,CAAC;IACrB,SAAS,CAAC,EAAE,OAAO,CAAC;IACpB,GAAG,EAAE,MAAM,CAAC;CACf"}

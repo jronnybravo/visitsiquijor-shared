@@ -1,0 +1,1 @@
+{"version":3,"file":"UserEmail.d.ts","sourceRoot":"","sources":["../../../src/types/entities/UserEmail.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,IAAI,EAAE,MAAM,QAAQ,CAAC;AAEnC,MAAM,WAAW,SAAS;IACtB,SAAS,EAAE,OAAO,CAAC;IACnB,UAAU,CAAC,EAAE,MAAM,CAAC;IACpB,IAAI,CAAC,EAAE,IAAI,CAAC;CACf"}
