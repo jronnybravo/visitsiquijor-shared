@@ -4,6 +4,7 @@ export interface Article {
     title: string;
     slug: string;
     content: string;
+    excerpt?: string;
     media?: any[];
     createdByAdministratorId: number;
     createdByAdministrator?: Administrator;
