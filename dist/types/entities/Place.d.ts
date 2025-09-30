@@ -3,6 +3,7 @@ import type { PlaceCategory } from './PlaceCategory';
 import type { Event } from './Event';
 import type { Advertisement } from './Advertisement';
 import type { PlaceBookmark } from './PlaceBookmark';
+import type { IMedia } from '../../interfaces';
 export interface Place {
     id: number;
     name: string;
@@ -11,7 +12,7 @@ export interface Place {
     coordinates?: string;
     featureStartsOn?: string;
     featureEndsOn?: string;
-    media?: any[];
+    media?: IMedia[];
     createdByAdministratorId?: number;
     createdAt: string;
     updatedAt: string;
@@ -21,7 +22,9 @@ export interface Place {
     events?: Event[];
     advertisements?: Advertisement[];
     bookmarks?: PlaceBookmark[];
-    isFeatured: boolean;
+    images: any;
+    videos: any;
     defaultImageUrl: string;
+    isFeatured: boolean;
 }
 //# sourceMappingURL=Place.d.ts.map

@@ -4,7 +4,7 @@ export interface Role {
     name: string;
     description: string;
     createdByAdministratorId?: number;
-    permissions: any[];
+    permissions: string[];
     createdByAdministrator?: Administrator;
     administrators?: Administrator[];
 }

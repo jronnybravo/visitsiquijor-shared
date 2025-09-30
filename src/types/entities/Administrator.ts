@@ -17,6 +17,7 @@ export interface Administrator {
     firstName: string;
     lastName: string;
     birthdate?: string;
+    address: string;
     nationality?: string;
     type: UserType;
     createdAt: string;
@@ -31,7 +32,7 @@ export interface Administrator {
     age: number;
     isAdult: boolean;
     roleId: number;
-    permissions?: any[];
+    permissions?: string[];
     role?: Role;
     createdRoles?: Role[];
     createdPlaces?: Place[];

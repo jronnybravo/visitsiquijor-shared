@@ -25,6 +25,7 @@ class TypeGenerator {
     private apiPath: string;
     private outputPath: string;
     private entities: Map<string, EntityInfo> = new Map();
+    private availableInterfaces: Set<string> = new Set();
 
     constructor(apiPath: string, outputPath: string) {
         this.apiPath = apiPath;
@@ -33,6 +34,9 @@ class TypeGenerator {
 
     async generate() {
         console.log('🚀 Starting type generation using TypeScript AST...');
+        
+        // Discover available interfaces first
+        await this.discoverAvailableInterfaces();
         
         // Parse all entity files using TypeScript compiler
         await this.parseEntities();
@@ -56,6 +60,41 @@ class TypeGenerator {
         await this.generateIndexFiles();
         
         console.log('✅ Type generation completed!');
+    }
+
+    private async discoverAvailableInterfaces() {
+        const interfacesPath = path.join(this.apiPath, 'src/interfaces');
+        if (!fs.existsSync(interfacesPath)) {
+            console.log('⚠️  No interfaces directory found');
+            return;
+        }
+
+        const files = fs.readdirSync(interfacesPath).filter(file => file.endsWith('.ts'));
+
+        for (const file of files) {
+            const filePath = path.join(interfacesPath, file);
+            const content = fs.readFileSync(filePath, 'utf-8');
+            
+            // Create TypeScript source file
+            const sourceFile = ts.createSourceFile(
+                filePath,
+                content,
+                ts.ScriptTarget.Latest,
+                true
+            );
+            
+            // Extract interface names
+            const visit = (node: ts.Node) => {
+                if (ts.isInterfaceDeclaration(node) && node.name) {
+                    this.availableInterfaces.add(node.name.text);
+                }
+                ts.forEachChild(node, visit);
+            };
+            
+            visit(sourceFile);
+        }
+
+        console.log(`🔍 Discovered interfaces: ${Array.from(this.availableInterfaces).join(', ')}`);
     }
 
     private async parseEntities() {
@@ -352,6 +391,24 @@ class TypeGenerator {
     }
 
     private mapSingleTypeToTS(typeText: string, columnDecorator?: {name: string, args: any[]}): string {
+        // Map TypeScript types first
+        switch (typeText) {
+            case 'Date':
+                return 'string';
+            case 'string':
+            case 'number':
+            case 'boolean':
+                return typeText;
+            default:
+                // For custom types, keep as is
+                break;
+        }
+        
+        // Check if this is a known interface
+        if (this.availableInterfaces.has(typeText)) {
+            return typeText;
+        }
+        
         // Check column decorator for specific types
         if (columnDecorator) {
             const hasDateTimeType = columnDecorator.args.some(arg => 
@@ -365,24 +422,16 @@ class TypeGenerator {
                 arg.includes("'json'") || arg.includes("'simple-json'") || arg.includes("type: 'simple-json'")
             );
             if (hasJsonType) {
+                // For JSON types, preserve the original type if it's a known interface
+                if (this.availableInterfaces.has(typeText)) {
+                    return typeText;
+                }
                 return 'any';
             }
         }
         
-        // Map TypeScript types
-        switch (typeText) {
-            case 'Date':
-                return 'string';
-            case 'string':
-            case 'number':
-            case 'boolean':
-                return typeText;
-            case 'IMedia':
-                return 'IMedia';
-            default:
-                // For custom types, keep as is
-                return typeText;
-        }
+        // For custom types, keep as is
+        return typeText;
     }
 
     private extractRelationTarget(typeText: string, isArray: boolean): string {
@@ -586,10 +635,13 @@ class TypeGenerator {
         // Add imports for related entities and enums
         const relatedEntities = new Set<string>();
         const relatedEnums = new Set<string>();
-        const needsIMedia = entityInfo.properties.some(p => p.type === 'IMedia');
+        const neededInterfaces = new Set<string>();
 
-        if (needsIMedia) {
-            imports.push("import type { IMedia } from '../../interfaces';");
+        // Check which interfaces are needed
+        for (const prop of entityInfo.properties) {
+            if (this.availableInterfaces.has(prop.type)) {
+                neededInterfaces.add(prop.type);
+            }
         }
 
         // Generate interface
@@ -612,12 +664,16 @@ class TypeGenerator {
                 for (const prop of parentEntity.properties) {
                     const optionalMark = prop.isOptional ? '?' : '';
                     const arrayMark = prop.isArray ? '[]' : '';
-                    interfaceLines.push(`    ${prop.name}${optionalMark}: ${prop.type}${arrayMark};`);
+                    // Handle interface arrays properly
+                    const typeName = this.availableInterfaces.has(prop.type) && prop.isArray ? prop.type : prop.type;
+                    interfaceLines.push(`    ${prop.name}${optionalMark}: ${typeName}${arrayMark};`);
                 }
                 for (const prop of parentEntity.computedProperties) {
                     const optionalMark = prop.isOptional ? '?' : '';
                     const arrayMark = prop.isArray ? '[]' : '';
-                    interfaceLines.push(`    ${prop.name}${optionalMark}: ${prop.type}${arrayMark};`);
+                    // Handle interface arrays properly
+                    const typeName = this.availableInterfaces.has(prop.type) && prop.isArray ? prop.type : prop.type;
+                    interfaceLines.push(`    ${prop.name}${optionalMark}: ${typeName}${arrayMark};`);
                 }
             }
         }
@@ -630,6 +686,12 @@ class TypeGenerator {
             // Check for enum types
             if (this.isEnumType(prop.type)) {
                 relatedEnums.add(prop.type);
+            }
+            // Check if this property needs interface import
+            if (this.availableInterfaces.has(prop.type) && prop.isArray) {
+                if (!neededInterfaces.has(prop.type)) {
+                    neededInterfaces.add(prop.type);
+                }
             }
         }
 
@@ -644,18 +706,28 @@ class TypeGenerator {
             imports.push(`import type { ${enumImports} } from '../enums';`);
         }
 
+        // Add imports for interfaces
+        if (neededInterfaces.size > 0) {
+            const interfaceImports = Array.from(neededInterfaces).join(', ');
+            imports.push(`import type { ${interfaceImports} } from '../../interfaces';`);
+        }
+
         // Add entity-specific properties
         for (const prop of entityInfo.properties) {
             const optionalMark = prop.isOptional ? '?' : '';
             const arrayMark = prop.isArray ? '[]' : '';
-            interfaceLines.push(`    ${prop.name}${optionalMark}: ${prop.type}${arrayMark};`);
+            // Handle interface arrays properly
+            const typeName = this.availableInterfaces.has(prop.type) && prop.isArray ? prop.type : prop.type;
+            interfaceLines.push(`    ${prop.name}${optionalMark}: ${typeName}${arrayMark};`);
         }
 
         // Add computed properties
         for (const prop of entityInfo.computedProperties) {
             const optionalMark = prop.isOptional ? '?' : '';
             const arrayMark = prop.isArray ? '[]' : '';
-            interfaceLines.push(`    ${prop.name}${optionalMark}: ${prop.type}${arrayMark};`);
+            // Handle interface arrays properly
+            const typeName = this.availableInterfaces.has(prop.type) && prop.isArray ? prop.type : prop.type;
+            interfaceLines.push(`    ${prop.name}${optionalMark}: ${typeName}${arrayMark};`);
         }
 
         interfaceLines.push('}');
@@ -760,9 +832,11 @@ class TypeGenerator {
     private discoverRequiredImports(content: string): string[] {
         const imports: string[] = [];
         
-        // Check for IMedia usage
-        if (content.includes('IMedia')) {
-            imports.push("import type { IMedia } from '../../interfaces';");
+        // Check for interface usage
+        for (const interfaceName of this.availableInterfaces) {
+            if (content.includes(interfaceName)) {
+                imports.push(`import type { ${interfaceName} } from '../../interfaces';`);
+            }
         }
         
         // Check for User usage

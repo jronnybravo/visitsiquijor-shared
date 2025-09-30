@@ -2,6 +2,7 @@ import type { Administrator } from './Administrator';
 import type { Place } from './Place';
 import type { EventCategory } from './EventCategory';
 import type { EventBookmark } from './EventBookmark';
+import type { IMedia } from '../../interfaces';
 export interface Event {
     id: number;
     name: string;
@@ -14,7 +15,7 @@ export interface Event {
     endsOn: string;
     featureStartsOn?: string;
     featureEndsOn?: string;
-    media?: any[];
+    media?: IMedia[];
     createdByAdministratorId?: number;
     createdAt: string;
     updatedAt: string;
@@ -23,9 +24,11 @@ export interface Event {
     place?: Place;
     categories?: EventCategory[];
     bookmarks?: EventBookmark[];
-    isHappening: boolean;
+    isHappeningToday: boolean;
     isUpcoming: boolean;
-    isFeatured: boolean;
+    images: any;
+    videos: any;
     defaultImageUrl: string;
+    isFeatured: boolean;
 }
 //# sourceMappingURL=Event.d.ts.map

@@ -10,6 +10,7 @@ export interface User {
     firstName: string;
     lastName: string;
     birthdate?: string;
+    address: string;
     nationality?: string;
     type: UserType;
     createdAt: string;
