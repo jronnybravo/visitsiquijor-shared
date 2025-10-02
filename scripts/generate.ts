@@ -911,9 +911,57 @@ class TypeGenerator {
     }
 }
 
+/**
+ * Find the API directory dynamically by checking for common folder names
+ * Supports both 'api' and 'visitsiquijor-api' folder names
+ */
+function findApiPath(): string {
+    const currentDir = process.cwd();
+    const parentDir = path.dirname(currentDir);
+    
+    // Check for common API folder names
+    const possibleApiPaths = [
+        path.join(parentDir, 'api'),
+        path.join(parentDir, 'visitsiquijor-api')
+    ];
+    
+    for (const apiPath of possibleApiPaths) {
+        // Check if the API path exists and has the expected structure
+        const entitiesPath = path.join(apiPath, 'src', 'entities');
+        if (fs.existsSync(entitiesPath)) {
+            console.log(`✅ Found API directory at: ${apiPath}`);
+            return apiPath;
+        }
+    }
+    
+    // If no API folder found, throw an error with helpful message
+    throw new Error(`❌ Could not find API directory. Looked for:
+${possibleApiPaths.map(p => `  - ${p}`).join('\n')}
+    
+Make sure the API project is in the parent directory with one of these names:
+  - api/
+  - visitsiquijor-api/
+  
+Or provide the API path as an argument: npm run generate <api-path>`);
+}
+
 // Main execution
 async function main() {
-    const apiPath = argv[2] || '../';
+    let apiPath: string;
+    
+    if (argv[2]) {
+        // API path provided as argument
+        apiPath = argv[2];
+    } else {
+        // Auto-detect API path
+        try {
+            apiPath = findApiPath();
+        } catch (error) {
+            console.error(error instanceof Error ? error.message : String(error));
+            process.exit(1);
+        }
+    }
+    
     const outputPath = argv[3] || './';
 
     const generator = new TypeGenerator(apiPath, outputPath);

@@ -6,7 +6,6 @@ export interface Article {
     title: string;
     slug: string;
     content: string;
-    excerpt?: string;
     featureStartsOn?: string;
     featureEndsOn?: string;
     featured: boolean;
