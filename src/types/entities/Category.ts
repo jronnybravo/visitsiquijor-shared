@@ -10,4 +10,6 @@ export interface Category {
     createdAt: string;
     updatedAt: string;
     deletedAt?: string;
+    parent?: Category;
+    children?: Category[];
 }

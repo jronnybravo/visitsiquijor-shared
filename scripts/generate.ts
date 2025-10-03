@@ -260,6 +260,36 @@ class TypeGenerator {
             };
         }
         
+        // Handle TreeParent and TreeChildren decorators
+        const treeParentDecorator = decorators.find(d => d.name === 'TreeParent');
+        const treeChildrenDecorator = decorators.find(d => d.name === 'TreeChildren');
+        
+        if (treeParentDecorator) {
+            const targetEntity = this.extractRelationTarget(typeInfo.type, false);
+            
+            return {
+                name: propertyName,
+                type: targetEntity,
+                isOptional: true,
+                isArray: false,
+                isRelation: true,
+                relationTarget: targetEntity
+            };
+        }
+        
+        if (treeChildrenDecorator) {
+            const targetEntity = this.extractRelationTarget(typeInfo.type, true);
+            
+            return {
+                name: propertyName,
+                type: targetEntity,
+                isOptional: true,
+                isArray: true,
+                isRelation: true,
+                relationTarget: targetEntity
+            };
+        }
+        
         // Handle relations
         const relationDecorator = decorators.find(d => 
             ['OneToMany', 'ManyToOne', 'ManyToMany'].includes(d.name)
