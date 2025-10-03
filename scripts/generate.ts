@@ -618,7 +618,7 @@ class TypeGenerator {
     }
 
     private async copyUtils() {
-        const sourceUtilsPath = path.join(this.apiPath, 'src/utils');
+        const sourceUtilsPath = path.join(this.apiPath, 'src/utils/shared');
         const targetUtilsPath = path.join(this.outputPath, 'src/utils');
         
         if (!fs.existsSync(sourceUtilsPath)) {
