@@ -15,6 +15,7 @@ export interface Article {
     createdAt: string;
     updatedAt: string;
     deletedAt?: string;
+    excerpt: string;
     images: any;
     videos: any;
     defaultImageUrl: string;
