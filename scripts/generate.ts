@@ -674,38 +674,13 @@ class TypeGenerator {
             }
         }
 
-        // Generate interface
-        interfaceLines.push(`export interface ${entityInfo.name} {`);
-
-        // Add properties from parent if it's a child entity
+        // Generate interface with proper inheritance
         if (entityInfo.isChildEntity && entityInfo.parentEntity) {
-            const parentEntity = this.entities.get(entityInfo.parentEntity);
-            if (parentEntity) {
-                // Add parent's imports
-                for (const prop of parentEntity.properties) {
-                    if (prop.isRelation && prop.relationTarget && prop.relationTarget !== entityInfo.name) {
-                        relatedEntities.add(prop.relationTarget);
-                    }
-                    if (this.isEnumType(prop.type)) {
-                        relatedEnums.add(prop.type);
-                    }
-                }
-                
-                for (const prop of parentEntity.properties) {
-                    const optionalMark = prop.isOptional ? '?' : '';
-                    const arrayMark = prop.isArray ? '[]' : '';
-                    // Handle interface arrays properly
-                    const typeName = this.availableInterfaces.has(prop.type) && prop.isArray ? prop.type : prop.type;
-                    interfaceLines.push(`    ${prop.name}${optionalMark}: ${typeName}${arrayMark};`);
-                }
-                for (const prop of parentEntity.computedProperties) {
-                    const optionalMark = prop.isOptional ? '?' : '';
-                    const arrayMark = prop.isArray ? '[]' : '';
-                    // Handle interface arrays properly
-                    const typeName = this.availableInterfaces.has(prop.type) && prop.isArray ? prop.type : prop.type;
-                    interfaceLines.push(`    ${prop.name}${optionalMark}: ${typeName}${arrayMark};`);
-                }
-            }
+            // Add import for parent entity
+            relatedEntities.add(entityInfo.parentEntity);
+            interfaceLines.push(`export interface ${entityInfo.name} extends ${entityInfo.parentEntity} {`);
+        } else {
+            interfaceLines.push(`export interface ${entityInfo.name} {`);
         }
 
         // Collect related entities and enums for imports

@@ -1,36 +1,12 @@
-import type { UserEmail } from './UserEmail';
-import type { RefreshToken } from './RefreshToken';
-import type { PlaceBookmark } from './PlaceBookmark';
-import type { EventBookmark } from './EventBookmark';
-import type { AccessLog } from './AccessLog';
+import type { User } from './User';
 import type { Role } from './Role';
 import type { Place } from './Place';
 import type { Event } from './Event';
 import type { Card } from './Card';
 import type { Advertisement } from './Advertisement';
 import type { Article } from './Article';
-import type { UserType } from '../enums';
 
-export interface Administrator {
-    id: number;
-    username?: string;
-    firstName: string;
-    lastName: string;
-    birthdate?: string;
-    address: string;
-    nationality?: string;
-    type: UserType;
-    createdAt: string;
-    updatedAt: string;
-    deletedAt?: string;
-    emails?: UserEmail[];
-    refreshTokens?: RefreshToken[];
-    placeBookmarks?: PlaceBookmark[];
-    eventBookmarks?: EventBookmark[];
-    accessLogs?: AccessLog[];
-    fullName: string;
-    age: number;
-    isAdult: boolean;
+export interface Administrator extends User {
     roleId: number;
     permissions?: string[];
     role?: Role;

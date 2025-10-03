@@ -4,7 +4,7 @@ export interface Category {
     id: number;
     type: CategoryType;
     name: string;
-    description: string;
+    description?: string;
     parentId?: number;
     priority?: number;
     createdAt: string;
