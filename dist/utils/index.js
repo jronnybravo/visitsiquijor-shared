@@ -15,6 +15,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./MockDataSource"), exports);
+__exportStar(require("./OnlineLocationFetcher"), exports);
 __exportStar(require("./Permission"), exports);
 __exportStar(require("./jwt"), exports);
 //# sourceMappingURL=index.js.map
