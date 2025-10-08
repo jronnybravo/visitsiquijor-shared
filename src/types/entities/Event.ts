@@ -13,7 +13,7 @@ export interface Event {
     coordinates?: string;
     organizer?: string;
     startsOn: string;
-    endsOn: string;
+    endsOn?: string;
     featureStartsOn?: string;
     featureEndsOn?: string;
     media?: IMedia[];
