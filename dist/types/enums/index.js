@@ -1,6 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserType = exports.CategoryType = exports.BookmarkTarget = void 0;
+exports.Gender = exports.UserType = exports.CategoryType = exports.BookmarkTarget = exports.ArticleStatus = void 0;
+var ArticleStatus;
+(function (ArticleStatus) {
+    ArticleStatus["DRAFT"] = "Draft";
+    ArticleStatus["PRIVATE"] = "Private";
+    ArticleStatus["PUBLISHED"] = "Published";
+})(ArticleStatus || (exports.ArticleStatus = ArticleStatus = {}));
 var BookmarkTarget;
 (function (BookmarkTarget) {
     BookmarkTarget["PLACE"] = "Place";
@@ -17,4 +23,10 @@ var UserType;
     UserType["VISITOR"] = "Visitor";
     UserType["RESIDENT"] = "Resident";
 })(UserType || (exports.UserType = UserType = {}));
+var Gender;
+(function (Gender) {
+    Gender["MALE"] = "Male";
+    Gender["FEMALE"] = "Female";
+    Gender["OTHER"] = "Other";
+})(Gender || (exports.Gender = Gender = {}));
 //# sourceMappingURL=index.js.map

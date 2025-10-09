@@ -1,4 +1,5 @@
 import type { Administrator } from './Administrator';
+import type { ArticleStatus } from '../enums';
 import type { IMedia } from '../../interfaces';
 export interface Article {
     id: number;
@@ -11,6 +12,7 @@ export interface Article {
     media?: IMedia[];
     createdByAdministratorId: number;
     createdByAdministrator?: Administrator;
+    status: ArticleStatus;
     createdAt: string;
     updatedAt: string;
     deletedAt?: string;
