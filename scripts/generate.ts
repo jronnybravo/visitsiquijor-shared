@@ -153,6 +153,9 @@ class TypeGenerator {
         }
         
         console.log(`\n🔍 Parsing entity: ${entityName}`);
+        if(entityName == 'UserEmail') {
+            console.log(classNode);
+        }
         
         // Check if it's a child entity and get parent
         const isChildEntity = this.hasDecorator(classNode, ['ChildEntity']);
@@ -220,6 +223,18 @@ class TypeGenerator {
                 type: 'number',
                 isOptional: false,
                 isArray: false,
+                isRelation: false
+            };
+        }
+        // Handle @PrimaryColumn
+        if (decorators.some(d => d.name === 'PrimaryColumn')) {
+            // Infer type from propertyNode
+            const mappedType = this.mapTypeToTS(typeInfo.type);
+            return {
+                name: propertyName,
+                type: mappedType.type,
+                isOptional: false,
+                isArray: mappedType.isArray,
                 isRelation: false
             };
         }
