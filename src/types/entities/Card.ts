@@ -4,6 +4,7 @@ import type { Administrator } from './Administrator';
 export interface Card {
     id: number;
     visitorId: number;
+    requestedByVisitorId: number;
     requestDatetime?: string;
     requestCoordinates?: string;
     printedByAdministratorId: number;
@@ -12,5 +13,6 @@ export interface Card {
     createdAt: string;
     deletedAt?: string;
     visitor?: Visitor;
+    requestedByVisitor?: Visitor;
     printedByAdministrator?: Administrator;
 }
