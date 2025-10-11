@@ -1,6 +1,5 @@
 import type { Administrator } from './Administrator';
 import type { ArticleStatus } from '../enums';
-import type { IMedia } from '../../interfaces';
 
 export interface Article {
     id: number;
@@ -10,7 +9,7 @@ export interface Article {
     featureStartsOn?: string;
     featureEndsOn?: string;
     featured: boolean;
-    media?: IMedia[];
+    imageUrl?: string | null;
     createdByAdministratorId: number;
     createdByAdministrator?: Administrator;
     status: ArticleStatus;
@@ -18,8 +17,5 @@ export interface Article {
     updatedAt: string;
     deletedAt?: string;
     excerpt: string;
-    images: any;
-    videos: any;
-    defaultImageUrl: string;
     isFeatured: boolean;
 }
