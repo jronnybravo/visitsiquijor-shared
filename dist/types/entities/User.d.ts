@@ -14,6 +14,7 @@ export interface User {
     nationality?: string;
     gender?: Gender;
     type: UserType;
+    imageUrl?: string;
     createdAt: string;
     updatedAt: string;
     deletedAt?: string;

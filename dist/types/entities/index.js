@@ -20,7 +20,7 @@ __exportStar(require("./Article"), exports);
 __exportStar(require("./Bookmark"), exports);
 __exportStar(require("./PlaceBookmark"), exports);
 __exportStar(require("./EventBookmark"), exports);
-__exportStar(require("./Card"), exports);
+__exportStar(require("./CardRequest"), exports);
 __exportStar(require("./Category"), exports);
 __exportStar(require("./PlaceCategory"), exports);
 __exportStar(require("./EventCategory"), exports);

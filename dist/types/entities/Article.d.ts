@@ -7,14 +7,13 @@ export interface Article {
     content: string;
     featureStartsOn?: string;
     featureEndsOn?: string;
-    featured: boolean;
-    imageUrl?: string | null;
     createdByAdministratorId: number;
-    createdByAdministrator?: Administrator;
     status: ArticleStatus;
+    imageUrl?: string;
     createdAt: string;
     updatedAt: string;
     deletedAt?: string;
+    createdByAdministrator?: Administrator;
     excerpt: string;
     isFeatured: boolean;
 }

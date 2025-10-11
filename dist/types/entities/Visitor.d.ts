@@ -1,7 +1,6 @@
 import type { User } from './User';
-import type { Card } from './Card';
+import type { CardRequest } from './CardRequest';
 export interface Visitor extends User {
-    cards?: Card[];
-    requestedCards?: Card[];
+    cardRequests?: CardRequest[];
 }
 //# sourceMappingURL=Visitor.d.ts.map

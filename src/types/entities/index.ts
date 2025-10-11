@@ -4,7 +4,7 @@ export * from './Article';
 export * from './Bookmark';
 export * from './PlaceBookmark';
 export * from './EventBookmark';
-export * from './Card';
+export * from './CardRequest';
 export * from './Category';
 export * from './PlaceCategory';
 export * from './EventCategory';
